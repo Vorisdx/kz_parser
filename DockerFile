@@ -9,12 +9,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libpango-1.0-0 libpangocairo-1.0-0 fontconfig xz-utils wget ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# 2) Geckodriver последней версии
-ENV GECKO_DRIVER_VERSION=0.36.1
-RUN wget -q "https://github.com/mozilla/geckodriver/releases/download/v${GECKO_DRIVER_VERSION}/geckodriver-v${GECKO_DRIVER_VERSION}-linux64.tar.gz" \
- && tar -xzf geckodriver-*.tar.gz -C /usr/local/bin \
- && chmod +x /usr/local/bin/geckodriver \
- && rm geckodriver-*.tar.gz
+ENV GECKO_DRIVER_VERSION=0.36.0
+RUN wget -q \
+    "https://github.com/mozilla/geckodriver/releases/download/v${GECKO_DRIVER_VERSION}/geckodriver-v${GECKO_DRIVER_VERSION}-linux64.tar.gz" \
+  && tar -xzf geckodriver-v${GECKO_DRIVER_VERSION}-linux64.tar.gz -C /usr/local/bin \
+  && chmod +x /usr/local/bin/geckodriver \
+  && rm geckodriver-v${GECKO_DRIVER_VERSION}-linux64.tar.gz
 
 # 3) Poetry и установка зависимостей (как раньше)
 RUN pip install --no-cache-dir "poetry==1.8.*"
