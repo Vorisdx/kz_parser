@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: streamlit-parser
+    runtime: docker
+    plan: starter          # или free/standard
+    branch: main
+    numInstances: 1
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: STREAMLIT_SERVER_PORT
+        value: "8080"
+      - key: TZ
+        value: Asia/Dushanbe

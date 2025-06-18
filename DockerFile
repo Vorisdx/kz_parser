@@ -1,36 +1,30 @@
-# ---------- 1. Базовый образ с нужной версией Python ----------
 FROM python:3.12.7-slim
 
-# ---------- 2. Системные библиотеки, необходимые Firefox ESR ----------
+# 1. Firefox-ESR и системные библиотеки
 RUN apt-get update && apt-get install -y --no-install-recommends \
         firefox-esr libgtk-3-0 libdbus-glib-1-2 wget ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# ---------- 3. geckodriver (выберите нужную версию) ----------
+# 2. geckodriver
 ENV GECKO_DRIVER_VERSION=0.34.0
 RUN wget -q https://github.com/mozilla/geckodriver/releases/download/v${GECKO_DRIVER_VERSION}/geckodriver-v${GECKO_DRIVER_VERSION}-linux64.tar.gz \
  && tar -xzf geckodriver-*.tar.gz -C /usr/local/bin \
  && rm geckodriver-*.tar.gz
 
-# ---------- 4. Poetry (глобально, без виртуального окружения) ----------
+# 3. Poetry (без создания виртуальных окружений)
 RUN pip install --no-cache-dir "poetry==1.8.*"
-ENV POETRY_VIRTUALENVS_CREATE=false \
-    POETRY_NO_INTERACTION=1
+ENV POETRY_VIRTUALENVS_CREATE=false POETRY_NO_INTERACTION=1
 
-# ---------- 5. Копируем манифесты зависимостей ---
-WORKDIR . 
+WORKDIR /app
 COPY pyproject.toml poetry.lock ./
-
-# ---------- 6. Устанавливаем зависимости проекта ----------
 RUN poetry install --no-dev --no-ansi
 
-# ---------- 7. Копируем источник приложения ----------
+# 4. Копируем приложение
 COPY app.py parser_refactored.py ./
 
-# ---------- 8. Переменные окружения (защита от случайного окна) ----------
+# 5. Гарантируем headless-режим и порт
 ENV MOZ_HEADLESS=1 \
     STREAMLIT_SERVER_PORT=8080 \
     STREAMLIT_SERVER_ADDRESS=0.0.0.0
 
-# ---------- 9. Запуск ----------
 CMD ["streamlit", "run", "app.py", "--server.port", "8080", "--server.address", "0.0.0.0"]
