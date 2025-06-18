@@ -65,14 +65,13 @@ ARRESTS_RENAME = {
     "Арест на транспорт": "vehicle_freeze",
 }
 
+
 DEBTORS_RENAME = {
     "ИИН": "iin",
-    "Категория": "category",
-    "Номер и дата исполнительного документа": "document_no_date",
-    "Сумма долга/основание долга": "debt_amount_or_reason",
-    "Дата исполнительного производства": "execution_date",
+    "Должникarrow_upward": "debtor",
+    "Дата исполнительного производстваarrow_upward": "execution_date",
     "Орган исполнительного пр-ва, судебный исполнитель": "enforcement_body",
-    "Орган, выдавший исполнительный документ": "issuing_authority",
+    "Орган, выдавший исполнительный документarrow_upward": "issuing_authority",
     "Наличие запрета на выезд из РК по исполнительным производствам ЧСИ/ГСИ": "travel_ban_status",
 }
 
@@ -148,9 +147,16 @@ class AdiletParser:
         self._driver.get(url)
 
     def _submit_iin(self, iin: str, page: _PageSpec) -> None:
+        """
+        Вводит ИИН, жмёт «Поиск», ждёт появления новой таблицы
+        ИЛИ всплытия snackbar «По запросу ничего не найдено».
+        После обработки snackbar сразу скрывается, чтобы не мешать
+        следующим итерациям.
+        """
         wait = WebDriverWait(self._driver, 25)
         tbody_sel = f".{page.table_wrapper_cls} tbody"
-
+        snackbar_sel = ".v-snack__wrapper.v-sheet.warning"
+        snackbar_btn_sel = ".v-snack__btn"
         # ---------- 1. Сохраняем подпись "старой" таблицы ----------
         try:
             old_hash = hashlib.md5(
@@ -161,24 +167,43 @@ class AdiletParser:
         except Exception:
             old_hash = None  # таблицы ещё не было
 
-        # ---------- 2. Очищаем поле (только рабочий JS-метод) ----------
+        # ---------- 2. Очищаем поле и вводим ИИН ----------
         inp = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, page.input_sel)))
         self._driver.execute_script(
             "arguments[0].value=''; arguments[0].dispatchEvent(new Event('input',{bubbles:true}));",
             inp,
         )
-        inp.send_keys(iin)
 
-        # ─ маленький debounce для маски/Vue
-        time.sleep(0.15)
+        # ---------- 5. Если snackbar ещё видим – закрываем ----------
+        try:
+            snack = self._driver.find_element(By.CSS_SELECTOR, snackbar_sel)
+            if snack.is_displayed():
+                # Пытаемся нажать «Закрыть»
+                try:
+                    snack.find_element(By.CSS_SELECTOR, snackbar_btn_sel).click()
+                except Exception:
+                    # Если кнопка не нашлась, скрываем через JS
+                    self._driver.execute_script(
+                        "arguments[0].style.display='none';", snack
+                    )
+        except Exception:
+            pass  # snackbar не найден – всё ок
+
+        inp.send_keys(iin)
+        time.sleep(0.15)  # debounce для Vue-маски
 
         # ---------- 3. Кликаем «Поиск» ----------
         wait.until(
             EC.element_to_be_clickable((By.CSS_SELECTOR, page.submit_sel))
         ).click()
 
-        # ---------- 4. Ждём, пока HTML tbody поменяется ----------
+        # ---------- 4. Ждём новую таблицу ИЛИ snackbar ----------
         def tbody_changed(driver):
+            # 4.1 – новый хэш таблицы
+            if page.url == ARRESTS_SPEC.url:
+                time.sleep(0.5)
+                return True
+
             try:
                 new_hash = hashlib.md5(
                     driver.find_element(By.CSS_SELECTOR, tbody_sel)
@@ -186,8 +211,22 @@ class AdiletParser:
                     .encode()
                 ).hexdigest()
             except Exception:
-                return False  # tbody ещё не появился
-            return old_hash is None or new_hash != old_hash
+                new_hash = None  # tbody ещё не появился
+
+            # 4.2 – виден ли snackbar «ничего не найдено»
+            try:
+                snack = driver.find_element(By.CSS_SELECTOR, snackbar_sel)
+                snack_visible = (
+                    snack.is_displayed()
+                    and "display: none" not in snack.get_attribute("style")
+                )
+            except Exception:
+                snack_visible = False
+
+            changed = (old_hash is None and new_hash is not None) or (
+                new_hash and new_hash != old_hash
+            )
+            return changed or snack_visible
 
         wait.until(tbody_changed)
 
