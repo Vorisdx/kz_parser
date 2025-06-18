@@ -1,30 +1,19 @@
-FROM python:3.12.7-slim
+FROM selenium/standalone-firefox:4.33.0-20250606
 
-# 1) Нативные библиотеки для headless-Firefox
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        firefox-esr libgtk-3-0 libdbus-glib-1-2 libasound2 libatk1.0-0 libatk-bridge2.0-0 \
-        libcups2 libdrm2 libgbm1 libgdk-pixbuf2.0-0 libx11-6 libx11-xcb1 \
-        libxcb1 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 \
-        libxi6 libxrandr2 libxrender1 libxss1 libxtst6 libnss3 libnspr4 \
-        libpango-1.0-0 libpangocairo-1.0-0 fontconfig xz-utils wget ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+USER root
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      python3 python3-pip python3-distutils \
+ && rm -rf /var/lib/apt/lists/*
 
-ENV GECKO_DRIVER_VERSION=0.36.0
-RUN wget -q \
-    "https://github.com/mozilla/geckodriver/releases/download/v${GECKO_DRIVER_VERSION}/geckodriver-v${GECKO_DRIVER_VERSION}-linux64.tar.gz" \
-  && tar -xzf geckodriver-v${GECKO_DRIVER_VERSION}-linux64.tar.gz -C /usr/local/bin \
-  && chmod +x /usr/local/bin/geckodriver \
-  && rm geckodriver-v${GECKO_DRIVER_VERSION}-linux64.tar.gz
-
-# 3) Poetry и установка зависимостей (как раньше)
-RUN pip install --no-cache-dir "poetry==1.8.*"
-ENV POETRY_VIRTUALENVS_CREATE=false POETRY_NO_INTERACTION=1
 WORKDIR /app
 COPY pyproject.toml poetry.lock ./
-RUN poetry install --no-dev --no-ansi
+RUN pip install --no-cache-dir poetry==1.8.* \
+ && poetry config virtualenvs.create false \
+ && poetry install --no-dev --no-ansi
+
 COPY app.py parser_refactored.py ./
 
-# 4) Переменные для headless и Streamlit
 ENV MOZ_HEADLESS=1 \
     STREAMLIT_SERVER_PORT=8080 \
     STREAMLIT_SERVER_ADDRESS=0.0.0.0
