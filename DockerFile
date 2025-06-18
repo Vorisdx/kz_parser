@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. geckodriver
-ENV GECKO_DRIVER_VERSION=0.34.0
+ENV GECKO_DRIVER_VERSION=0.36.0
 RUN wget -q https://github.com/mozilla/geckodriver/releases/download/v${GECKO_DRIVER_VERSION}/geckodriver-v${GECKO_DRIVER_VERSION}-linux64.tar.gz \
  && tar -xzf geckodriver-*.tar.gz -C /usr/local/bin \
  && rm geckodriver-*.tar.gz
