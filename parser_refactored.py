@@ -20,6 +20,13 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+import hashlib
+import time
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException
+
 
 import warnings
 
@@ -140,30 +147,49 @@ class AdiletParser:
     def _navigate(self, url: str):
         self._driver.get(url)
 
-    def _submit_iin(self, iin: str, page: _PageSpec):
-        wait = WebDriverWait(self._driver, 15)
-        input_elem = wait.until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, page.input_sel))
+    def _submit_iin(self, iin: str, page: _PageSpec) -> None:
+        wait = WebDriverWait(self._driver, 25)
+        tbody_sel = f".{page.table_wrapper_cls} tbody"
+
+        # ---------- 1. Сохраняем подпись "старой" таблицы ----------
+        try:
+            old_hash = hashlib.md5(
+                self._driver.find_element(By.CSS_SELECTOR, tbody_sel)
+                .get_attribute("innerHTML")
+                .encode()  # type: ignore
+            ).hexdigest()
+        except Exception:
+            old_hash = None  # таблицы ещё не было
+
+        # ---------- 2. Очищаем поле (только рабочий JS-метод) ----------
+        inp = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, page.input_sel)))
+        self._driver.execute_script(
+            "arguments[0].value=''; arguments[0].dispatchEvent(new Event('input',{bubbles:true}));",
+            inp,
         )
+        inp.send_keys(iin)
 
-        # очистка
-        input_elem.clear()
-        if input_elem.get_attribute("value"):
-            combo = (
-                Keys.COMMAND
-                if self._driver.capabilities.get("platformName") == "mac"
-                else Keys.CONTROL
-            )
-            input_elem.send_keys(combo, "a", Keys.DELETE)
+        # ─ маленький debounce для маски/Vue
+        time.sleep(0.15)
 
-        time.sleep(0.05)
-        input_elem.send_keys(iin)
-        time.sleep(0.1)  # Vue debounce
-
-        submit_btn = wait.until(
+        # ---------- 3. Кликаем «Поиск» ----------
+        wait.until(
             EC.element_to_be_clickable((By.CSS_SELECTOR, page.submit_sel))
-        )
-        submit_btn.click()
+        ).click()
+
+        # ---------- 4. Ждём, пока HTML tbody поменяется ----------
+        def tbody_changed(driver):
+            try:
+                new_hash = hashlib.md5(
+                    driver.find_element(By.CSS_SELECTOR, tbody_sel)
+                    .get_attribute("innerHTML")
+                    .encode()
+                ).hexdigest()
+            except Exception:
+                return False  # tbody ещё не появился
+            return old_hash is None or new_hash != old_hash
+
+        wait.until(tbody_changed)
 
     def _wait_for_table(self, page: _PageSpec):
         try:
