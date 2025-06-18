@@ -26,6 +26,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.firefox.options import Options as FirefoxOptions
 
 
 import warnings
@@ -87,7 +88,7 @@ class AdiletParser:
         self, *, headless: bool = False, driver: webdriver.Remote | None = None
     ):
         self._driver = driver or self._create_default_driver(headless=headless)
-        logger.info("WebDriver initialised (Safari, headless=%s)", headless)
+        logger.info("WebDriver initialised (Firefox, headless=%s)", headless)
 
     # -------------------------- public API ---------------------------
 
@@ -137,11 +138,26 @@ class AdiletParser:
     # ------------------------ selenium helpers ----------------------
 
     @staticmethod
+    # def _create_default_driver(*, headless: bool):
+    #     opts = webdriver.SafariOptions()
+    #     if headless:
+    #         opts.add_argument("--headless")
+    #     return webdriver.Safari(options=opts)
     def _create_default_driver(*, headless: bool):
-        opts = webdriver.SafariOptions()
+        opts = FirefoxOptions()
+
+        # Без этого аргумента Gecko открывает окно даже при opts.headless = True
         if headless:
-            opts.add_argument("--headless")
-        return webdriver.Safari(options=opts)
+            opts.add_argument("-headless")  # ключ с одиночным «-»
+
+        # --желательно, но не обязательно--: задаём размер виртуального экрана,
+        # иначе некоторые сайты «падают» из-за ширины 0 px.
+        opts.add_argument("--width=1920")
+        opts.add_argument("--height=1080")
+
+        # Если geckodriver не лежит в PATH, укажите executable_path
+        # return webdriver.Firefox(executable_path="/usr/local/bin/geckodriver", options=opts)
+        return webdriver.Firefox(options=opts)
 
     def _navigate(self, url: str):
         self._driver.get(url)
