@@ -216,8 +216,8 @@ class AdiletParser:
         # ---------- 4. Ждём новую таблицу ИЛИ snackbar ----------
         def tbody_changed(driver):
             # 4.1 – новый хэш таблицы
-            if page.url == ARRESTS_SPEC.url:
-                time.sleep(0.5)
+            if page.url == ARRESTS_SPEC.url or page.url == DEBTORS_SPEC.url:
+                time.sleep(0.7)
                 return True
 
             try:
